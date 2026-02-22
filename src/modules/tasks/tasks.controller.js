@@ -97,13 +97,17 @@ exports.getUserTags = async (req, res) => {
   try {
     const tasks = await Task.find({ userId: req.user.id });
 
-    const allTags = tasks.flatMap(task => task.tags || []);
+    if (!tasks || tasks.length === 0) {
+      return res.json([]); 
+    }
 
+    const allTags = tasks.flatMap(task => task.tags || []);
     const uniqueTags = [...new Set(allTags)];
 
     res.json(uniqueTags);
 
   } catch (err) {
+    console.error('Tags error:', err.message); // 👈 add this
     res.status(500).json({ message: err.message });
   }
 };
