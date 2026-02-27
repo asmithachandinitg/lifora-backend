@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const readingSchema = new mongoose.Schema({
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title:      { type: String, required: true, trim: true },
   author:     { type: String, default: '' },
   status:     { type: String, enum: ['want', 'reading', 'completed', 'dnf'], default: 'want' },

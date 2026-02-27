@@ -17,6 +17,7 @@ const foodRoutes = require('./modules/food/food.routes');
 const periodRoutes = require('./modules/period/period.routes');
 const pregnancyRoutes = require('./modules/pregnancy/pregnancy.routes');
 const habitRoutes = require('./modules/habits/habit.routes');
+const authRoutes = require('./modules/auth/auth.routes');
 
 app.use(cors());
 app.use(express.json());
@@ -34,8 +35,9 @@ app.use('/api/reading', readingRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/period', periodRoutes);
 app.use('/api/pregnancy', pregnancyRoutes);
-app.use('/api/daily-symptoms',  require('./modules/period/daily-symptoms.routes'));
+app.use('/api/daily-symptoms', require('./modules/period/daily-symptoms.routes'));
 app.use('/api/habits', habitRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
   res.send('Lifora API running');
