@@ -1,23 +1,26 @@
 const mongoose = require('mongoose');
 
 const packingItemSchema = new mongoose.Schema({
+  _id:      { type: String },          // ← frontend sends Date.now().toString()
   name:     { type: String, required: true },
   packed:   { type: Boolean, default: false },
   category: { type: String, default: 'essentials' }
-});
+}, { _id: false });                    // ← disable auto ObjectId
 
 const itineraryDaySchema = new mongoose.Schema({
+  _id:        { type: String },        // ← same fix
   date:       { type: String, required: true },
   title:      { type: String, default: 'Day Plan' },
   activities: { type: [String], default: [] }
-});
+}, { _id: false });
 
 const tripExpenseSchema = new mongoose.Schema({
+  _id:      { type: String },          // ← same fix
   title:    { type: String, required: true },
   amount:   { type: Number, required: true, min: 0 },
   category: { type: String, default: 'other' },
   date:     { type: String, required: true }
-});
+}, { _id: false });
 
 const tripSchema = new mongoose.Schema({
   userId:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

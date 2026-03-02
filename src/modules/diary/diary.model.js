@@ -15,13 +15,7 @@ const diarySchema = new mongoose.Schema({
 
   mood: {
     type: String,
-    enum: [
-      'happy',
-      'sad',
-      'angry',
-      'neutral',
-      'excited'
-    ],
+    enum: ['happy', 'sad', 'angry', 'neutral', 'excited'],
     default: 'neutral'
   },
 
@@ -34,9 +28,21 @@ const diarySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+
+  // ── Travel link ──────────────────────────────
+  linkedTripId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trip',
+    default: null
+  },
+
+  linkedTripName: {
+    type: String,
+    default: null
   }
+  // ─────────────────────────────────────────────
 
 }, { timestamps: true });
 
-module.exports =
-  mongoose.model('Diary', diarySchema);
+module.exports = mongoose.model('Diary', diarySchema);
