@@ -1,5 +1,7 @@
-const Expense = require('./expense.model');
-const Account = require('./account.model');
+const Expense         = require('./expense.model');
+const Account         = require('./account.model');
+const Budget          = require('./budget.model');
+const ExpenseCategory = require('./expenseCategory.model');
 
 // ===== EXPENSES =====
 
@@ -33,7 +35,57 @@ exports.createExpense = async (req, res) => {
       }
     }
 
-    res.status(201).json(expense);
+    // ── Budget alert check (only for expenses, not income) ────
+    let budgetAlert = null;
+
+    if (type === 'expense' && category) {
+      const budget = await Budget.findOne({ userId: req.user.id, categoryId: category });
+
+      if (budget && budget.limit > 0) {
+        // Sum all expenses in this category for the current month
+        const now       = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+        const monthExpenses = await Expense.find({
+          userId:   req.user.id,
+          category: category,
+          type:     'expense',
+          datetime: { $gte: monthStart, $lte: monthEnd }
+        });
+
+        const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
+        const percent    = Math.round((totalSpent / budget.limit) * 100);
+
+        // Fetch category name for a friendly message
+        const cat = await ExpenseCategory.findById(category).catch(() => null);
+        const catName = cat?.name || 'this category';
+
+        if (percent >= 100) {
+          budgetAlert = {
+            level:    'danger',
+            percent,
+            spent:    totalSpent,
+            limit:    budget.limit,
+            category: catName,
+            message:  `You've exceeded your budget for ${catName}! (${percent}% used)`
+          };
+        } else if (percent >= 80) {
+          budgetAlert = {
+            level:    'warning',
+            percent,
+            spent:    totalSpent,
+            limit:    budget.limit,
+            category: catName,
+            message:  `You've used ${percent}% of your budget for ${catName}`
+          };
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────
+
+    res.status(201).json({ expense, budgetAlert });
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -124,7 +176,7 @@ exports.deleteAccount = async (req, res) => {
 
 exports.getCategories = async (req, res) => {
   try {
-    const categories = await require('./expenseCategory.model').find({ userId: req.user.id });
+    const categories = await ExpenseCategory.find({ userId: req.user.id });
     res.json(categories);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -134,7 +186,7 @@ exports.getCategories = async (req, res) => {
 exports.createCategory = async (req, res) => {
   try {
     const { name, icon, type, budget } = req.body;
-    const category = await require('./expenseCategory.model').create({
+    const category = await ExpenseCategory.create({
       userId: req.user.id, name, icon, type, budget: budget || 0
     });
     res.status(201).json(category);
@@ -145,7 +197,7 @@ exports.createCategory = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
   try {
-    const category = await require('./expenseCategory.model').findOneAndUpdate(
+    const category = await ExpenseCategory.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       req.body,
       { new: true }
@@ -159,7 +211,7 @@ exports.updateCategory = async (req, res) => {
 
 exports.deleteCategory = async (req, res) => {
   try {
-    await require('./expenseCategory.model').findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    await ExpenseCategory.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -167,7 +219,6 @@ exports.deleteCategory = async (req, res) => {
 };
 
 // ===== BUDGETS =====
-const Budget = require('./budget.model');
 
 exports.getBudgets = async (req, res) => {
   try {
@@ -181,7 +232,6 @@ exports.getBudgets = async (req, res) => {
 exports.setBudget = async (req, res) => {
   try {
     const { categoryId, limit } = req.body;
-    // upsert: create if not exists, update if exists
     const budget = await Budget.findOneAndUpdate(
       { userId: req.user.id, categoryId },
       { limit },
@@ -197,6 +247,44 @@ exports.deleteBudget = async (req, res) => {
   try {
     await Budget.findOneAndDelete({ userId: req.user.id, categoryId: req.params.categoryId });
     res.json({ message: 'Budget removed' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ===== BUDGET STATUS (get current month spend vs limits for all categories) =====
+
+exports.getBudgetStatus = async (req, res) => {
+  try {
+    const now        = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const budgets  = await Budget.find({ userId: req.user.id });
+    const expenses = await Expense.find({
+      userId:   req.user.id,
+      type:     'expense',
+      datetime: { $gte: monthStart, $lte: monthEnd }
+    });
+
+    const result = await Promise.all(budgets.map(async (b) => {
+      const spent   = expenses
+        .filter(e => e.category === b.categoryId)
+        .reduce((s, e) => s + e.amount, 0);
+      const percent = b.limit > 0 ? Math.round((spent / b.limit) * 100) : 0;
+      const cat     = await ExpenseCategory.findById(b.categoryId).catch(() => null);
+
+      return {
+        categoryId:   b.categoryId,
+        categoryName: cat?.name || b.categoryId,
+        limit:        b.limit,
+        spent,
+        percent,
+        level: percent >= 100 ? 'danger' : percent >= 80 ? 'warning' : 'ok'
+      };
+    }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

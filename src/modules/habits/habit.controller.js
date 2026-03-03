@@ -1,4 +1,5 @@
 const Habit = require('./habit.model');
+const Goal  = require('../goals/goal.model'); // adjust path if needed
 
 // ── Helper: completion rate (last 30 days) ─────────────────
 function calcCompletionRate(habit) {
@@ -32,7 +33,7 @@ function calcCurrentStreak(habit) {
     if (comp) {
       streak++;
     } else if (i > 0) {
-      break; // allow today to be unmarked
+      break;
     }
   }
   return streak;
@@ -52,6 +53,15 @@ exports.getHabits = async (req, res) => {
 exports.createHabit = async (req, res) => {
   try {
     const habit = await Habit.create({ ...req.body, userId: req.user.id });
+
+    // If this habit was created from a goal, add it to goal's linkedHabitIds
+    if (habit.linkedGoalId) {
+      await Goal.findOneAndUpdate(
+        { _id: habit.linkedGoalId, userId: req.user.id },
+        { $addToSet: { linkedHabitIds: habit._id } }
+      );
+    }
+
     res.status(201).json(habit);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -76,21 +86,29 @@ exports.updateHabit = async (req, res) => {
 // ── DELETE habit ───────────────────────────────────────────
 exports.deleteHabit = async (req, res) => {
   try {
-    await Habit.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    const habit = await Habit.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!habit) return res.status(404).json({ message: 'Not found' });
+
+    // Remove from goal's linkedHabitIds if linked
+    if (habit.linkedGoalId) {
+      await Goal.findOneAndUpdate(
+        { _id: habit.linkedGoalId, userId: req.user.id },
+        { $pull: { linkedHabitIds: habit._id } }
+      );
+    }
+
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ── POST toggle log for a date ─────────────────────────────
 exports.logCompletion = async (req, res) => {
   try {
     const { date, completed, note } = req.body;
     const habit = await Habit.findOne({ _id: req.params.id, userId: req.user.id });
     if (!habit) return res.status(404).json({ message: 'Not found' });
 
-    // Update existing or push new completion
     const idx = habit.completions.findIndex(c => c.date === date);
     if (idx > -1) {
       habit.completions[idx].completed = completed;
@@ -99,11 +117,57 @@ exports.logCompletion = async (req, res) => {
       habit.completions.push({ date, completed, note: note || '' });
     }
 
-    // Recalculate streaks
     habit.currentStreak = calcCurrentStreak(habit);
     habit.longestStreak = Math.max(habit.longestStreak, habit.currentStreak);
-
     await habit.save();
+
+    // ── Update linked goal's progress ──────────────────────
+    if (habit.linkedGoalId) {
+      const goal = await Goal.findOne({ _id: habit.linkedGoalId, userId: req.user.id });
+      if (goal && goal.linkedHabitIds.length > 0) {
+
+        const linkedHabits = await Habit.find({
+          _id: { $in: goal.linkedHabitIds },
+          userId: req.user.id
+        });
+
+        const today        = new Date();
+        const goalStart    = new Date(goal.createdAt);
+        const goalEnd      = new Date(goal.deadline);
+        const totalDays    = Math.ceil((goalEnd - goalStart) / (1000 * 60 * 60 * 24)) || 1;
+        const goalStartStr = goalStart.toISOString().split('T')[0];
+        const todayStr     = today.toISOString().split('T')[0];
+
+        // Start with dates where first habit was completed
+        const allDates = new Set(
+          linkedHabits[0].completions
+            .filter(c => c.completed && c.date >= goalStartStr && c.date <= todayStr)
+            .map(c => c.date)
+        );
+
+        // Intersect with every other linked habit — day counts only if ALL checked
+        for (let i = 1; i < linkedHabits.length; i++) {
+          const habitDates = new Set(
+            linkedHabits[i].completions
+              .filter(c => c.completed)
+              .map(c => c.date)
+          );
+          for (const d of allDates) {
+            if (!habitDates.has(d)) allDates.delete(d);
+          }
+        }
+
+        const completedDays = allDates.size;
+        const progress      = Math.min(Math.round((completedDays / totalDays) * 100), 100);
+        const status        = progress === 100 ? 'completed'
+                            : progress > 0    ? 'in-progress'
+                            :                   'not-started';
+
+        await Goal.findByIdAndUpdate(goal._id, { progress, status });
+      }
+    }
+    // ──────────────────────────────────────────────────────
+
     res.json(habit);
   } catch (err) {
     res.status(500).json({ message: err.message });

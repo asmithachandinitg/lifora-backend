@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const completionSchema = new mongoose.Schema({
-  date:      { type: String, required: true },   // 'YYYY-MM-DD'
+  date:      { type: String, required: true },
   completed: { type: Boolean, default: true },
   note:      { type: String, default: '' }
 }, { _id: false });
@@ -19,6 +19,12 @@ const habitSchema = new mongoose.Schema({
   currentStreak: { type: Number, default: 0 },
   longestStreak: { type: Number, default: 0 },
   notes:         { type: String, default: '' },
+
+  // ── Goal link ──────────────────────────────────────────────
+  linkedGoalId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Goal', default: null },
+  linkedGoalTitle: { type: String, default: null }
+  // ──────────────────────────────────────────────────────────
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Habit', habitSchema);

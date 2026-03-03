@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
   phone: { type: String, default: '' },
+  phoneCode: { type: String, default: '' },
   gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
   dob: { type: String, default: '' },
   age: { type: Number, default: 0 },
