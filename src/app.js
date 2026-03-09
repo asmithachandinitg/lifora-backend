@@ -20,6 +20,7 @@ const habitRoutes = require('./modules/habits/habit.routes');
 const authRoutes = require('./modules/auth/auth.routes');
 const knowledgeRoutes = require('./modules/knowledge/knowledge.routes');
 const visionRoutes = require('./modules/visionboard/visionboard.routes');
+const notoficationRoutes = require('./modules/notification/notification.routes');
 
 app.use(cors());
 app.use(express.json());
@@ -42,6 +43,7 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/visionboard', visionRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notoficationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Lifora API running');

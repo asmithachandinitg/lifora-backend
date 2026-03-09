@@ -27,6 +27,9 @@ router.get(
   getTasks
 );
 
+router.get('/tags', authMiddleware, getUserTags);
+router.post('/tags', authMiddleware, createTag);
+
 /* GET ONE */
 router.get(
   '/:id',
@@ -47,8 +50,5 @@ router.delete(
   authMiddleware,
   deleteTask
 );
-
-router.get('/tags', authMiddleware, getUserTags);
-router.post('/tags', authMiddleware, createTag);
 
 module.exports = router;
