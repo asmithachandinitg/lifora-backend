@@ -38,3 +38,23 @@ exports.updateModules = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
+exports.uploadPhoto = async (req, res) => {
+  try {
+    const { photo } = req.body; 
+    if (!photo) return res.status(400).json({ message: 'No photo provided' });
+
+    if (photo.length > 2 * 1024 * 1024) {
+      return res.status(400).json({ message: 'Image too large. Max 1.5MB.' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profilePhoto: photo },
+      { new: true }
+    ).select('-password');
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

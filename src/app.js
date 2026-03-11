@@ -23,7 +23,8 @@ const visionRoutes = require('./modules/visionboard/visionboard.routes');
 const notoficationRoutes = require('./modules/notification/notification.routes');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use('/api/users', userRoutes);
 app.use('/api/diary', diaryRoutes);
 app.use('/api/tasks', taskRoutes);

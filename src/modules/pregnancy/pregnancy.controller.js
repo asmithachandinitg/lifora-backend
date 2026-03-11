@@ -5,7 +5,7 @@ const { PregnancyProfile, PregnancyEntry } = require('./pregnancy.model');
 exports.getProfile = async (req, res) => {
   try {
     const profile = await PregnancyProfile.findOne({ userId: req.user.id });
-    if (!profile) return res.status(404).json({ message: 'No profile found' });
+    if (!profile) return res.json(null);
     res.json(profile);
   } catch (err) {
     res.status(500).json({ message: err.message });
